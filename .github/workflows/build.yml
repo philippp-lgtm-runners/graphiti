@@ -22,7 +22,13 @@ jobs:
         id: version
         env:
           REF: ${{ github.ref }}
-        run: echo "tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+        run: |
+          TAG="${REF#refs/tags/}"
+          # Strip leading "v" and trailing "-falkordb*" suffix to get the pristine PyPI version.
+          PYPI="${TAG#v}"
+          PYPI="${PYPI%-falkordb*}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "pypi=${PYPI}" >> "$GITHUB_OUTPUT"
 
       - name: Ensure buildx builder
         run: |
@@ -39,17 +45,18 @@ jobs:
 
       - name: Build & push image
         env:
-          VERSION: ${{ steps.version.outputs.tag }}
+          IMAGE_TAG: ${{ steps.version.outputs.tag }}
+          PYPI_VERSION: ${{ steps.version.outputs.pypi }}
         run: |
           docker buildx build \
             --push \
             --cache-from "type=registry,ref=${REGISTRY}/${IMAGE}:buildcache" \
             --cache-to   "type=registry,ref=${REGISTRY}/${IMAGE}:buildcache,mode=max" \
-            --build-arg "GRAPHITI_VERSION=${VERSION}" \
+            --build-arg "GRAPHITI_VERSION=${PYPI_VERSION}" \
             --build-arg "VCS_REF=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.version=${IMAGE_TAG}" \
             --label "org.opencontainers.image.source=https://github.com/philippp-lgtm-runners/graphiti" \
-            -t "${REGISTRY}/${IMAGE}:${VERSION}" \
+            -t "${REGISTRY}/${IMAGE}:${IMAGE_TAG}" \
             -t "${REGISTRY}/${IMAGE}:latest" \
             .
 
