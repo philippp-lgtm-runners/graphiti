@@ -8,10 +8,51 @@ concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  REGISTRY: ghcr.4cp-family.com
+  IMAGE: graphiti
+
 jobs:
   build:
-    uses: philippp-lgtm-runners/workflows/.github/workflows/docker-build-push.yml@main
-    with:
-      image: graphiti
-      source_url: https://github.com/philippp-lgtm-runners/graphiti
-    secrets: inherit
+    runs-on: [self-hosted, linux, docker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        env:
+          REF: ${{ github.ref }}
+        run: echo "tag=${REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure buildx builder
+        run: |
+          if ! docker buildx inspect ci-builder >/dev/null 2>&1; then
+            docker buildx create --name ci-builder --driver docker-container --bootstrap
+          fi
+          docker buildx use ci-builder
+
+      - name: Login to registry
+        env:
+          REG_USER: ${{ secrets.REGISTRY_USERNAME }}
+          REG_PASS: ${{ secrets.REGISTRY_PASSWORD }}
+        run: echo "$REG_PASS" | docker login "$REGISTRY" -u "$REG_USER" --password-stdin
+
+      - name: Build & push image
+        env:
+          VERSION: ${{ steps.version.outputs.tag }}
+        run: |
+          docker buildx build \
+            --push \
+            --cache-from "type=registry,ref=${REGISTRY}/${IMAGE}:buildcache" \
+            --cache-to   "type=registry,ref=${REGISTRY}/${IMAGE}:buildcache,mode=max" \
+            --build-arg "GRAPHITI_VERSION=${VERSION}" \
+            --build-arg "VCS_REF=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.source=https://github.com/philippp-lgtm-runners/graphiti" \
+            -t "${REGISTRY}/${IMAGE}:${VERSION}" \
+            -t "${REGISTRY}/${IMAGE}:latest" \
+            .
+
+      - name: Cleanup
+        if: always()
+        run: docker logout "${REGISTRY}" || true
