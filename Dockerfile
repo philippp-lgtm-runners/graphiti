@@ -41,22 +41,25 @@ COPY ./server/pyproject.toml ./server/README.md ./server/uv.lock ./
 COPY ./server/graph_service ./graph_service
 
 # Install server dependencies (without graphiti-core from lockfile)
-# Then install graphiti-core from PyPI at the desired version
-# This prevents the stale lockfile from pinning an old graphiti-core version
+# Then install graphiti-core from PyPI at the desired version into the
+# project venv (.venv). The upstream Dockerfile uses `--system`, which
+# installs into /usr/local while `uv run uvicorn` runs from .venv — so the
+# falkordb extra silently ends up in a Python prefix that never loads at
+# runtime. Install into the same .venv that uv sync populated.
 ARG INSTALL_FALKORDB=true
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev && \
     if [ -n "$GRAPHITI_VERSION" ]; then \
         if [ "$INSTALL_FALKORDB" = "true" ]; then \
-            uv pip install --system --upgrade "graphiti-core[falkordb]==$GRAPHITI_VERSION"; \
+            uv pip install --upgrade "graphiti-core[falkordb]==$GRAPHITI_VERSION"; \
         else \
-            uv pip install --system --upgrade "graphiti-core==$GRAPHITI_VERSION"; \
+            uv pip install --upgrade "graphiti-core==$GRAPHITI_VERSION"; \
         fi; \
     else \
         if [ "$INSTALL_FALKORDB" = "true" ]; then \
-            uv pip install --system --upgrade "graphiti-core[falkordb]"; \
+            uv pip install --upgrade "graphiti-core[falkordb]"; \
         else \
-            uv pip install --system --upgrade graphiti-core; \
+            uv pip install --upgrade graphiti-core; \
         fi; \
     fi
 
