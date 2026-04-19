@@ -1,0 +1,17 @@
+name: Build & Push
+
+on:
+  push:
+    tags: ["v*-falkordb*"]
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: philippp-lgtm-runners/workflows/.github/workflows/docker-build-push.yml@main
+    with:
+      image: graphiti
+      source_url: https://github.com/philippp-lgtm-runners/graphiti
+    secrets: inherit
