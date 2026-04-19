@@ -50,8 +50,6 @@ jobs:
         run: |
           docker buildx build \
             --push \
-            --cache-from "type=registry,ref=${REGISTRY}/${IMAGE}:buildcache" \
-            --cache-to   "type=registry,ref=${REGISTRY}/${IMAGE}:buildcache,mode=max" \
             --build-arg "GRAPHITI_VERSION=${PYPI_VERSION}" \
             --build-arg "VCS_REF=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${IMAGE_TAG}" \
